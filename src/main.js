@@ -1,4 +1,4 @@
-import { TIMELINE, REUNION, ENDING, TITLE_SCREEN } from "./timeline.js";
+import { TIMELINE, LOCKED, REUNION, ENDING, TITLE_SCREEN } from "./timeline.js";
 
 // ---------------------------------------------------------------------
 // Config del mapa
@@ -22,6 +22,8 @@ const LEVEL_PLACES = {
   entrada: { x: 4, y: 12 },
   hogares: { x: 6, y: 4, w: 12, h: 6 },
   mar_caribe: { x: 30, y: 4, w: 12, h: 6 },
+  cienaga: { x: 38, y: 16, w: 12, h: 6 },
+  sierra_nevada: { x: 38, y: 26, w: 14, h: 6 },
   cafeteria: { x: 6, y: 46, w: 12, h: 6 },
   bloque3_atras: { x: 57, y: 44 },
   bloque3: { x: 52, y: 46, w: 10, h: 6 },
@@ -31,8 +33,6 @@ const LEVEL_PLACES = {
 // más completo. Se pueden ajustar libremente sin romper nada.
 const DECOR_BUILDINGS = [
   { x: 2, y: 16, w: 10, h: 10, label: "Gorgona (Bloque 8)" },
-  { x: 38, y: 16, w: 12, h: 6, label: "Edificio Ciénaga" },
-  { x: 38, y: 26, w: 14, h: 6, label: "Edificio Sierra Nevada" },
   { x: 20, y: 38, w: 10, h: 6, label: "Biblioteca" },
   { x: 24, y: 46, w: 10, h: 6, label: "Bloque de aulas" },
   { x: 38, y: 46, w: 10, h: 6, label: "Bloque de aulas" },
@@ -298,6 +298,17 @@ k.scene("game", () => {
     { gridX: entrada.x, gridY: entrada.y, moving: false },
   ]);
 
+  // ---- Fragmentos de historia + objetos (recompensa por cada uno) ----
+  const TOTAL_FRAGMENTS = TIMELINE.length;
+  const collected = new Set();
+  const counter = k.add([
+    k.text(`Fragmentos: 0/${TOTAL_FRAGMENTS}`, { size: 7 }),
+    k.pos(6, 4),
+    k.color(255, 255, 255),
+    k.fixed(),
+    k.z(200),
+  ]);
+
   let dialogOpen = false;
 
   function showDialog(title, subtitle, text, onClose) {
@@ -348,10 +359,20 @@ k.scene("game", () => {
     const key = `${x},${y}`;
     if (stopTiles.has(key)) {
       const entry = stopTiles.get(key);
-      showDialog(entry.npc || entry.place, entry.place, entry.text);
+      const isNew = !collected.has(entry.id);
+      showDialog(entry.npc || entry.place, entry.place, entry.text, () => {
+        if (!isNew) return;
+        collected.add(entry.id);
+        counter.text = `Fragmentos: ${collected.size}/${TOTAL_FRAGMENTS}`;
+        showDialog("¡Conseguiste un objeto!", null, entry.item);
+      });
       return;
     }
     if (x === sweetheart.x && y === sweetheart.y) {
+      if (collected.size < TOTAL_FRAGMENTS) {
+        showDialog("...", null, LOCKED.text);
+        return;
+      }
       showDialog("♥", null, REUNION.text, () => k.go("ending"));
     }
   }

@@ -4,8 +4,8 @@ import { TIMELINE, REUNION, ENDING, TITLE_SCREEN } from "./timeline.js";
 // Config del mapa
 // ---------------------------------------------------------------------
 const TILE = 16;
-const COLS = 36; // ancho total del campus (en tiles)
-const ROWS = 28; // alto total del campus (en tiles)
+const COLS = 76; // ancho total del campus (en tiles) — bien amplio
+const ROWS = 56; // alto total del campus (en tiles)
 const VIEW_COLS = 22; // cuánto se ve en pantalla (la cámara hace scroll)
 const VIEW_ROWS = 16;
 const SCALE = 3;
@@ -13,43 +13,47 @@ const MOVE_TIME = 0.12;
 
 // Mapa estilizado a partir del bosquejo del campus real (no es
 // geográficamente exacto, pero respeta la posición relativa de cada
-// zona). "w"/"h" = tamaño del edificio en tiles; los lugares de la
-// historia (los que están en TIMELINE) no llevan "w"/"h" salvo que
-// representen un edificio real.
+// zona, y la distancia entre Mar Caribe y el Bloque 3 es bien grande
+// para que se sienta como esos ~5 minutos de caminata reales).
+// "w"/"h" = tamaño del edificio en tiles; los lugares de la historia
+// (los que están en TIMELINE) no llevan "w"/"h" salvo que representen
+// un edificio real.
 const LEVEL_PLACES = {
-  entrada: { x: 2, y: 6 },
-  hogares: { x: 3, y: 2, w: 6, h: 3 },
-  mar_caribe: { x: 15, y: 2, w: 6, h: 3 },
-  cafeteria: { x: 3, y: 22, w: 6, h: 3 },
-  bloque3_atras: { x: 27, y: 21 },
-  bloque3: { x: 26, y: 22, w: 5, h: 3 },
+  entrada: { x: 4, y: 12 },
+  hogares: { x: 6, y: 4, w: 12, h: 6 },
+  mar_caribe: { x: 30, y: 4, w: 12, h: 6 },
+  cafeteria: { x: 6, y: 46, w: 12, h: 6 },
+  bloque3_atras: { x: 57, y: 44 },
+  bloque3: { x: 52, y: 46, w: 10, h: 6 },
 };
 
 // Edificios decorativos (sin diálogo), solo para que el campus se sienta
 // más completo. Se pueden ajustar libremente sin romper nada.
 const DECOR_BUILDINGS = [
-  { x: 1, y: 8, w: 5, h: 5, label: "Gorgona (Bloque 8)" },
-  { x: 19, y: 8, w: 6, h: 3, label: "Edificio Ciénaga" },
-  { x: 19, y: 13, w: 7, h: 3, label: "Edificio Sierra Nevada" },
-  { x: 10, y: 18, w: 5, h: 3, label: "Biblioteca" },
-  { x: 12, y: 22, w: 5, h: 3, label: "Bloque de aulas" },
-  { x: 19, y: 22, w: 5, h: 3, label: "Bloque de aulas" },
+  { x: 2, y: 16, w: 10, h: 10, label: "Gorgona (Bloque 8)" },
+  { x: 38, y: 16, w: 12, h: 6, label: "Edificio Ciénaga" },
+  { x: 38, y: 26, w: 14, h: 6, label: "Edificio Sierra Nevada" },
+  { x: 20, y: 38, w: 10, h: 6, label: "Biblioteca" },
+  { x: 24, y: 46, w: 10, h: 6, label: "Bloque de aulas" },
+  { x: 38, y: 46, w: 10, h: 6, label: "Bloque de aulas" },
 ];
 
 // El lago (con su puente) que aparece en el bosquejo, solo de ambiente.
-const LAKE = { cx: 11, cy: 11, rx: 4, ry: 4 };
-const BRIDGE_Y = 11;
+const LAKE = { cx: 22, cy: 22, rx: 8, ry: 8 };
+const BRIDGE_Y = 22;
 
 // Árboles sueltos, también solo de ambiente.
 const TREE_SPOTS = [
-  { x: 11, y: 3 },
-  { x: 30, y: 4 },
-  { x: 23, y: 7 },
-  { x: 30, y: 10 },
-  { x: 14, y: 17 },
-  { x: 18, y: 17 },
-  { x: 30, y: 17 },
-  { x: 9, y: 17 },
+  { x: 24, y: 6 },
+  { x: 55, y: 6 },
+  { x: 45, y: 12 },
+  { x: 65, y: 20 },
+  { x: 60, y: 30 },
+  { x: 33, y: 40 },
+  { x: 44, y: 40 },
+  { x: 65, y: 44 },
+  { x: 60, y: 10 },
+  { x: 8, y: 40 },
 ];
 
 const k = kaplay({
@@ -57,7 +61,7 @@ const k = kaplay({
   height: VIEW_ROWS * TILE,
   scale: SCALE,
   crisp: true,
-  background: [40, 44, 52],
+  background: [86, 168, 92],
   font: "monospace",
   letterbox: true,
 });
@@ -110,6 +114,8 @@ function carveBridge(grid, lake, y) {
   }
 }
 
+// Camino recto en L (horizontal y después vertical). Se usa para las
+// rutas que TIENEN que llegar bien a cada parada.
 function paintPath(grid, x1, y1, x2, y2) {
   let x = x1;
   let y = y1;
@@ -122,6 +128,33 @@ function paintPath(grid, x1, y1, x2, y2) {
     y += y < y2 ? 1 : -1;
   }
   if (grid[y2] && grid[y2][x2] === "grass") grid[y2][x2] = "path";
+}
+
+// Camino en diagonal (línea recta), para los senderos que cortan campo
+// abierto como en el bosquejo. Es solo decorativo: si se cruza con un
+// edificio, esa porción simplemente no se pinta (el resto del camino
+// sigue funcionando igual).
+function paintDiagonal(grid, x1, y1, x2, y2) {
+  const dx = Math.abs(x2 - x1);
+  const dy = Math.abs(y2 - y1);
+  const sx = x1 < x2 ? 1 : -1;
+  const sy = y1 < y2 ? 1 : -1;
+  let err = dx - dy;
+  let x = x1;
+  let y = y1;
+  while (true) {
+    if (grid[y] && grid[y][x] === "grass") grid[y][x] = "path";
+    if (x === x2 && y === y2) break;
+    const e2 = 2 * err;
+    if (e2 > -dy) {
+      err -= dy;
+      x += sx;
+    }
+    if (e2 < dx) {
+      err += dx;
+      y += sy;
+    }
+  }
 }
 
 function buildLevel() {
@@ -179,20 +212,24 @@ function buildLevel() {
   const sweetheart = { x: b3.x + Math.floor(b3.w / 2) + 1, y: b3.y - 1 };
   grid[sweetheart.y][sweetheart.x] = "sweetheart";
 
-  // Camino visual conectando entrada -> paradas -> bloque 3 (solo
-  // estético: se puede caminar por cualquier parte del pasto igual).
-  // Los waypoints intermedios rodean los edificios de Cafetería y
-  // Bloque 3 en vez de cruzarlos en línea recta.
+  // Columna despejada a la izquierda de la Cafetería y a la derecha del
+  // Bloque de aulas 2 — se usan para rodear esos edificios sin cruzarlos.
+  const BELOW_ROW = ROWS - 3;
+
+  // Ruta principal (garantiza que se pueda llegar a cada parada):
+  // horizontal arriba (Hogares -> Mar Caribe), un tramo vertical largo
+  // bajando por el costado despejado del lago/Ciénaga/Sierra Nevada, y
+  // horizontal abajo para entrar a cada edificio desde su frente.
   const route = [
     entrada,
     stopMarks.hogares,
     stopMarks.mar_caribe,
-    { x: 6, y: 21 },
-    { x: 2, y: 21 },
-    { x: 2, y: 25 },
+    { x: 36, y: BELOW_ROW },
+    { x: 12, y: BELOW_ROW },
     stopMarks.cafeteria,
-    { x: 25, y: 25 },
-    { x: 25, y: 21 },
+    { x: 12, y: BELOW_ROW },
+    { x: 49, y: BELOW_ROW },
+    { x: 49, y: 44 },
     stopMarks.bloque3_atras,
     sweetheart,
   ].filter(Boolean);
@@ -200,6 +237,11 @@ function buildLevel() {
   for (let i = 0; i < route.length - 1; i++) {
     paintPath(grid, route[i].x, route[i].y, route[i + 1].x, route[i + 1].y);
   }
+
+  // Senderos diagonales decorativos (como las líneas diagonales del
+  // bosquejo), cortando campo abierto entre zonas.
+  paintDiagonal(grid, 36, 10, 34, 34);
+  paintDiagonal(grid, 11, 25, 20, 38);
 
   return { grid, labels, stopTiles, entrada, sweetheart };
 }
@@ -225,9 +267,13 @@ k.scene("title", () => {
 k.scene("game", () => {
   const { grid, labels, stopTiles, entrada, sweetheart } = buildLevel();
 
+  // Solo se crean objetos para tiles que NO son pasto liso (el pasto ya
+  // es el color de fondo) — así el mapa puede ser grande sin que el
+  // juego tenga que dibujar miles de rectángulos verdes de más.
   for (let y = 0; y < ROWS; y++) {
     for (let x = 0; x < COLS; x++) {
       const type = grid[y][x];
+      if (type === "grass") continue;
       k.add([k.rect(TILE, TILE), k.pos(x * TILE, y * TILE), k.color(...COLORS[type]), k.z(0)]);
 
       if (type === "marker") {

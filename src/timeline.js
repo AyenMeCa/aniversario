@@ -1,32 +1,49 @@
-// Acá va la historia real del juego: cada "curiosidad" es una parada en el
-// camino que muestra un cuadro de diálogo cuando el jugador la toca.
-// Editá el título y el texto de cada una (y agregá/quitá las que quieras,
-// el juego reparte las paradas automáticamente a lo largo del camino).
+// ---------------------------------------------------------------------
+// LA HISTORIA DEL JUEGO
+// ---------------------------------------------------------------------
+// Cada entrada de PLACES es una parada del campus donde el jugador se
+// cruza con alguien (un amigo/a en común) que cuenta una curiosidad o
+// anécdota. El "id" tiene que coincidir con uno de los lugares definidos
+// en LEVEL_PLACES dentro de src/main.js (ahí está la posición en el mapa).
+//
+// Si más adelante se te ocurre un lugar nuevo, avisame en el chat y lo
+// agregamos acá + su posición en el mapa.
+// ---------------------------------------------------------------------
 
 export const TIMELINE = [
   {
-    title: "Cómo nos conocimos",
-    text: "TODO: contá acá cómo se conocieron.",
+    id: "cafeteria",
+    place: "La Cafetería",
+    npc: "TODO: nombre de un amigo/a en común",
+    text: "TODO: la anécdota de acá (ej: la fila para reclamar su almuerzo).",
   },
   {
-    title: "Nuestra primera cita",
-    text: "TODO: contá acá cómo fue la primera cita.",
+    id: "hogares",
+    place: "Zona de los Hogares",
+    npc: "TODO: nombre de un amigo/a en común",
+    text: "TODO: otra anécdota de cuando se cruzaban por acá dando clase.",
   },
   {
-    title: "Un momento gracioso",
-    text: "TODO: alguna anécdota divertida de los dos.",
+    id: "mar_caribe",
+    place: "Zona Mar Caribe",
+    npc: "TODO: nombre de un amigo/a en común",
+    text: "TODO: anécdota de cuando se cruzaban por acá dando clase.",
   },
   {
-    title: "Un viaje inolvidable",
-    text: "TODO: un viaje o salida que recuerden con cariño.",
-  },
-  {
-    title: "Lo que más admiro de vos",
-    text: "TODO: algo lindo y específico sobre esa persona.",
+    id: "bloque3_atras",
+    place: "Detrás del Bloque 3",
+    npc: "TODO: nombre de un amigo/a en común (o dejalo vacío)",
+    text: "TODO: el lugar donde siempre se sentaban juntos.",
   },
 ];
 
-// Mensaje final, se muestra al llegar al punto B (el final del camino).
+// Lo que se muestra apenas el jugador llega al Bloque 3 y la ve, antes
+// del mensaje final. Podés cambiar este texto por lo que quieras.
+export const REUNION = {
+  text: "Ahí está. Después de recorrer todo el camino, la encontrás.",
+};
+
+// Mensaje final del juego (después de la reunión en el Bloque 3).
 export const ENDING = {
   title: "Hoy",
   text: "TODO: el mensaje final para el aniversario (puede ser una declaración, una propuesta, lo que quieras).",
@@ -34,6 +51,6 @@ export const ENDING = {
 
 // Título y subtítulo de la pantalla de inicio.
 export const TITLE_SCREEN = {
-  title: "Nuestro Camino",
+  title: "Mi aventura para encontrarte",
   subtitle: "Un juego para nuestro aniversario",
 };

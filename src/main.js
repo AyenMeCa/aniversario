@@ -1,14 +1,37 @@
-import { TIMELINE, ENDING, TITLE_SCREEN } from "./timeline.js";
+import { TIMELINE, REUNION, ENDING, TITLE_SCREEN } from "./timeline.js";
 
 // ---------------------------------------------------------------------
 // Config del mapa
 // ---------------------------------------------------------------------
 const TILE = 16;
-const COLS = 30;
-const ROWS = 9;
-const VIEW_COLS = 20;
+const COLS = 48;
+const ROWS = 18;
+const VIEW_COLS = 24;
 const SCALE = 3;
 const MOVE_TIME = 0.12;
+
+// Mapa estilizado del campus (no es geográficamente exacto: son las zonas
+// que importan en la historia + algunos edificios genéricos de relleno
+// para que se sienta como un campus real). "w"/"h" = tamaño del edificio
+// en tiles; los lugares de la historia (los que están en TIMELINE) no
+// llevan "w"/"h" salvo que representen un edificio real.
+const LEVEL_PLACES = {
+  entrada: { x: 3, y: 15 },
+  cafeteria: { x: 6, y: 12, w: 4, h: 3 },
+  hogares: { x: 13, y: 8, w: 5, h: 3 },
+  mar_caribe: { x: 24, y: 8, w: 5, h: 3 },
+  bloque3_atras: { x: 38, y: 11 },
+  bloque3: { x: 35, y: 13, w: 6, h: 4 },
+};
+
+// Edificios decorativos (sin diálogo), solo para que el campus se sienta
+// más completo. Se pueden ajustar libremente sin romper nada.
+const DECOR_BUILDINGS = [
+  { x: 5, y: 2, w: 4, h: 3, label: "Bloque 1" },
+  { x: 13, y: 2, w: 5, h: 3, label: "Biblioteca" },
+  { x: 22, y: 2, w: 4, h: 3, label: "Bloque 2" },
+  { x: 34, y: 3, w: 7, h: 4, label: "Estadio" },
+];
 
 const k = kaplay({
   width: VIEW_COLS * TILE,
@@ -22,21 +45,43 @@ const k = kaplay({
 
 // ---------------------------------------------------------------------
 // "Sprites" placeholder por color. Cuando tengas el tileset/personajes
-// descargados (ver README), esto es lo único que hay que cambiar:
-// reemplazar k.color(...) por k.sprite("nombre-del-sprite") y cargar
-// las imágenes con k.loadSprite() antes de kaplay() construir el mapa.
+// descargados (ver assets/README.md), esto es lo único que hay que
+// cambiar: reemplazar k.color(...) por k.sprite("nombre-del-sprite").
 // ---------------------------------------------------------------------
 const COLORS = {
   grass: [86, 168, 92],
   path: [214, 186, 130],
   wall: [52, 88, 54],
+  building: [150, 140, 120],
   markerA: [240, 200, 60],
-  markerB: [230, 90, 120],
   marker: [250, 230, 90],
+  sweetheart: [235, 110, 160],
   player: [220, 70, 70],
 };
 
-const WALKABLE = new Set(["grass", "path", "markerA", "markerB", "marker"]);
+const WALKABLE = new Set(["grass", "path", "markerA", "marker", "sweetheart"]);
+
+function carveBuilding(grid, b) {
+  for (let y = b.y; y < b.y + b.h; y++) {
+    for (let x = b.x; x < b.x + b.w; x++) {
+      grid[y][x] = "building";
+    }
+  }
+}
+
+function paintPath(grid, x1, y1, x2, y2) {
+  let x = x1;
+  let y = y1;
+  while (x !== x2) {
+    if (grid[y][x] === "grass") grid[y][x] = "path";
+    x += x < x2 ? 1 : -1;
+  }
+  while (y !== y2) {
+    if (grid[y][x] === "grass") grid[y][x] = "path";
+    y += y < y2 ? 1 : -1;
+  }
+  if (grid[y2] && grid[y2][x2] === "grass") grid[y2][x2] = "path";
+}
 
 function buildLevel() {
   const grid = [];
@@ -44,31 +89,58 @@ function buildLevel() {
     const row = [];
     for (let x = 0; x < COLS; x++) {
       const isBorder = x === 0 || y === 0 || x === COLS - 1 || y === ROWS - 1;
-      let type = "grass";
-      if (isBorder) type = "wall";
-      else if (y === 4) type = "path";
-      else if ((y === 1 || y === ROWS - 2) && x % 4 === 2) type = "wall";
-      row.push(type);
+      row.push(isBorder ? "wall" : "grass");
     }
     grid.push(row);
   }
 
-  const pointA = { x: 2, y: 4 };
-  const pointB = { x: COLS - 3, y: 4 };
-  grid[pointA.y][pointA.x] = "markerA";
-  grid[pointB.y][pointB.x] = "markerB";
-
-  const markers = new Map(); // "x,y" -> entrada de TIMELINE
-  const usableStart = 5;
-  const usableEnd = COLS - 5;
-  const span = usableEnd - usableStart;
-  TIMELINE.forEach((entry, i) => {
-    const x = usableStart + Math.round(((i + 1) * span) / (TIMELINE.length + 1));
-    grid[4][x] = "marker";
-    markers.set(`${x},4`, entry);
+  const labels = [];
+  DECOR_BUILDINGS.forEach((b) => {
+    carveBuilding(grid, b);
+    labels.push({ x: b.x, y: b.y - 1, text: b.label });
   });
 
-  return { grid, pointA, pointB, markers };
+  const stopTiles = new Map(); // "x,y" -> entrada de TIMELINE
+  const orderedStops = [];
+
+  TIMELINE.forEach((entry) => {
+    const place = LEVEL_PLACES[entry.id];
+    if (!place) return;
+
+    let markX = place.x;
+    let markY = place.y;
+
+    if (place.w) {
+      carveBuilding(grid, place);
+      labels.push({ x: place.x, y: place.y - 1, text: entry.place });
+      markX = place.x + Math.floor(place.w / 2);
+      markY = place.y + place.h;
+    }
+
+    grid[markY][markX] = "marker";
+    stopTiles.set(`${markX},${markY}`, entry);
+    orderedStops.push({ x: markX, y: markY });
+  });
+
+  const entrada = LEVEL_PLACES.entrada;
+  grid[entrada.y][entrada.x] = "markerA";
+
+  const b3 = LEVEL_PLACES.bloque3;
+  carveBuilding(grid, b3);
+  labels.push({ x: b3.x, y: b3.y - 1, text: "Bloque 3" });
+  const b3X = b3.x + Math.floor(b3.w / 2);
+  const b3Y = b3.y - 1; // tile justo enfrente (arriba) de la entrada del edificio
+  grid[b3Y][b3X] = "sweetheart";
+
+  // Camino visual conectando entrada -> paradas -> bloque 3 (en línea recta
+  // entre puntos consecutivos; es solo estético, se puede caminar por
+  // cualquier parte del pasto igual).
+  const route = [entrada, ...orderedStops, { x: b3X, y: b3Y }];
+  for (let i = 0; i < route.length - 1; i++) {
+    paintPath(grid, route[i].x, route[i].y, route[i + 1].x, route[i + 1].y);
+  }
+
+  return { grid, labels, stopTiles, entrada, sweetheart: { x: b3X, y: b3Y } };
 }
 
 // ---------------------------------------------------------------------
@@ -76,11 +148,11 @@ function buildLevel() {
 // ---------------------------------------------------------------------
 k.scene("title", () => {
   k.add([k.rect(VIEW_COLS * TILE, ROWS * TILE), k.pos(0, 0), k.color(30, 30, 45)]);
-  k.add([k.text(TITLE_SCREEN.title, { size: 16 }), k.pos(16, 40), k.color(255, 255, 255)]);
-  k.add([k.text(TITLE_SCREEN.subtitle, { size: 8 }), k.pos(16, 68), k.color(200, 200, 220)]);
+  k.add([k.text(TITLE_SCREEN.title, { size: 16, width: VIEW_COLS * TILE - 32 }), k.pos(16, 40), k.color(255, 255, 255)]);
+  k.add([k.text(TITLE_SCREEN.subtitle, { size: 8 }), k.pos(16, 90), k.color(200, 200, 220)]);
   k.add([
     k.text("Presioná Espacio para empezar", { size: 8 }),
-    k.pos(16, 112),
+    k.pos(16, ROWS * TILE - 32),
     k.color(255, 220, 120),
   ]);
   k.onKeyPress("space", () => k.go("game"));
@@ -90,7 +162,7 @@ k.scene("title", () => {
 // Escena: juego
 // ---------------------------------------------------------------------
 k.scene("game", () => {
-  const { grid, pointA, markers } = buildLevel();
+  const { grid, labels, stopTiles, entrada, sweetheart } = buildLevel();
 
   for (let y = 0; y < ROWS; y++) {
     for (let x = 0; x < COLS; x++) {
@@ -101,26 +173,30 @@ k.scene("game", () => {
         k.add([k.text("!", { size: 8 }), k.pos(x * TILE + 5, y * TILE - 3), k.color(90, 60, 10), k.z(5)]);
       } else if (type === "markerA") {
         k.add([k.text("A", { size: 8 }), k.pos(x * TILE + 4, y * TILE - 1), k.color(90, 70, 10), k.z(5)]);
-      } else if (type === "markerB") {
-        k.add([k.text("B", { size: 8 }), k.pos(x * TILE + 4, y * TILE - 1), k.color(90, 20, 40), k.z(5)]);
+      } else if (type === "sweetheart") {
+        k.add([k.text("♥", { size: 8 }), k.pos(x * TILE + 4, y * TILE - 1), k.color(200, 30, 90), k.z(5)]);
       }
     }
   }
 
+  labels.forEach((l) => {
+    k.add([k.text(l.text, { size: 6 }), k.pos(l.x * TILE, l.y * TILE + 2), k.color(230, 230, 235), k.z(5)]);
+  });
+
   const player = k.add([
     k.rect(TILE - 2, TILE - 2),
-    k.pos(pointA.x * TILE + 1, pointA.y * TILE + 1),
+    k.pos(entrada.x * TILE + 1, entrada.y * TILE + 1),
     k.color(...COLORS.player),
     k.z(10),
-    { gridX: pointA.x, gridY: pointA.y, moving: false },
+    { gridX: entrada.x, gridY: entrada.y, moving: false },
   ]);
 
   let dialogOpen = false;
 
-  function showDialog(title, text, onClose) {
+  function showDialog(title, subtitle, text, onClose) {
     dialogOpen = true;
     const boxW = VIEW_COLS * TILE - 16;
-    const boxH = 44;
+    const boxH = 52;
     const boxX = 8;
     const boxY = ROWS * TILE - boxH - 6;
 
@@ -128,9 +204,18 @@ k.scene("game", () => {
       k.add([k.rect(boxW, boxH), k.pos(boxX, boxY), k.color(20, 20, 30), k.fixed(), k.z(100)]),
       k.add([k.rect(boxW - 4, boxH - 4), k.pos(boxX + 2, boxY + 2), k.color(245, 245, 235), k.fixed(), k.z(101)]),
       k.add([k.text(title, { size: 8 }), k.pos(boxX + 8, boxY + 6), k.color(70, 45, 15), k.z(102), k.fixed()]),
+    ];
+
+    if (subtitle) {
+      elements.push(
+        k.add([k.text(subtitle, { size: 6 }), k.pos(boxX + 8, boxY + 17), k.color(120, 100, 70), k.z(102), k.fixed()])
+      );
+    }
+
+    elements.push(
       k.add([
         k.text(text, { size: 7, width: boxW - 16 }),
-        k.pos(boxX + 8, boxY + 18),
+        k.pos(boxX + 8, boxY + (subtitle ? 27 : 18)),
         k.color(30, 30, 30),
         k.z(102),
         k.fixed(),
@@ -141,8 +226,8 @@ k.scene("game", () => {
         k.color(130, 130, 130),
         k.z(102),
         k.fixed(),
-      ]),
-    ];
+      ])
+    );
 
     const handler = k.onKeyPress("space", () => {
       elements.forEach((e) => k.destroy(e));
@@ -154,14 +239,13 @@ k.scene("game", () => {
 
   function checkTrigger(x, y) {
     const key = `${x},${y}`;
-    if (markers.has(key)) {
-      const entry = markers.get(key);
-      showDialog(entry.title, entry.text);
+    if (stopTiles.has(key)) {
+      const entry = stopTiles.get(key);
+      showDialog(entry.npc || entry.place, entry.place, entry.text);
       return;
     }
-    const type = grid[y][x];
-    if (type === "markerB") {
-      showDialog("...", "Llegaste.", () => k.go("ending"));
+    if (x === sweetheart.x && y === sweetheart.y) {
+      showDialog("♥", null, REUNION.text, () => k.go("ending"));
     }
   }
 

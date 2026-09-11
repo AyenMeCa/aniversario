@@ -4,38 +4,57 @@ import { TIMELINE, REUNION, ENDING, TITLE_SCREEN } from "./timeline.js";
 // Config del mapa
 // ---------------------------------------------------------------------
 const TILE = 16;
-const COLS = 48;
-const ROWS = 18;
-const VIEW_COLS = 24;
+const COLS = 36; // ancho total del campus (en tiles)
+const ROWS = 28; // alto total del campus (en tiles)
+const VIEW_COLS = 22; // cuánto se ve en pantalla (la cámara hace scroll)
+const VIEW_ROWS = 16;
 const SCALE = 3;
 const MOVE_TIME = 0.12;
 
-// Mapa estilizado del campus (no es geográficamente exacto: son las zonas
-// que importan en la historia + algunos edificios genéricos de relleno
-// para que se sienta como un campus real). "w"/"h" = tamaño del edificio
-// en tiles; los lugares de la historia (los que están en TIMELINE) no
-// llevan "w"/"h" salvo que representen un edificio real.
+// Mapa estilizado a partir del bosquejo del campus real (no es
+// geográficamente exacto, pero respeta la posición relativa de cada
+// zona). "w"/"h" = tamaño del edificio en tiles; los lugares de la
+// historia (los que están en TIMELINE) no llevan "w"/"h" salvo que
+// representen un edificio real.
 const LEVEL_PLACES = {
-  entrada: { x: 3, y: 15 },
-  cafeteria: { x: 6, y: 12, w: 4, h: 3 },
-  hogares: { x: 13, y: 8, w: 5, h: 3 },
-  mar_caribe: { x: 24, y: 8, w: 5, h: 3 },
-  bloque3_atras: { x: 38, y: 11 },
-  bloque3: { x: 35, y: 13, w: 6, h: 4 },
+  entrada: { x: 2, y: 6 },
+  hogares: { x: 3, y: 2, w: 6, h: 3 },
+  mar_caribe: { x: 15, y: 2, w: 6, h: 3 },
+  cafeteria: { x: 3, y: 22, w: 6, h: 3 },
+  bloque3_atras: { x: 27, y: 21 },
+  bloque3: { x: 26, y: 22, w: 5, h: 3 },
 };
 
 // Edificios decorativos (sin diálogo), solo para que el campus se sienta
 // más completo. Se pueden ajustar libremente sin romper nada.
 const DECOR_BUILDINGS = [
-  { x: 5, y: 2, w: 4, h: 3, label: "Bloque 1" },
-  { x: 13, y: 2, w: 5, h: 3, label: "Biblioteca" },
-  { x: 22, y: 2, w: 4, h: 3, label: "Bloque 2" },
-  { x: 34, y: 3, w: 7, h: 4, label: "Estadio" },
+  { x: 1, y: 8, w: 5, h: 5, label: "Gorgona (Bloque 8)" },
+  { x: 19, y: 8, w: 6, h: 3, label: "Edificio Ciénaga" },
+  { x: 19, y: 13, w: 7, h: 3, label: "Edificio Sierra Nevada" },
+  { x: 10, y: 18, w: 5, h: 3, label: "Biblioteca" },
+  { x: 12, y: 22, w: 5, h: 3, label: "Bloque de aulas" },
+  { x: 19, y: 22, w: 5, h: 3, label: "Bloque de aulas" },
+];
+
+// El lago (con su puente) que aparece en el bosquejo, solo de ambiente.
+const LAKE = { cx: 11, cy: 11, rx: 4, ry: 4 };
+const BRIDGE_Y = 11;
+
+// Árboles sueltos, también solo de ambiente.
+const TREE_SPOTS = [
+  { x: 11, y: 3 },
+  { x: 30, y: 4 },
+  { x: 23, y: 7 },
+  { x: 30, y: 10 },
+  { x: 14, y: 17 },
+  { x: 18, y: 17 },
+  { x: 30, y: 17 },
+  { x: 9, y: 17 },
 ];
 
 const k = kaplay({
   width: VIEW_COLS * TILE,
-  height: ROWS * TILE,
+  height: VIEW_ROWS * TILE,
   scale: SCALE,
   crisp: true,
   background: [40, 44, 52],
@@ -51,6 +70,8 @@ const k = kaplay({
 const COLORS = {
   grass: [86, 168, 92],
   path: [214, 186, 130],
+  bridge: [156, 112, 70],
+  water: [72, 122, 192],
   wall: [52, 88, 54],
   building: [150, 140, 120],
   markerA: [240, 200, 60],
@@ -59,13 +80,33 @@ const COLORS = {
   player: [220, 70, 70],
 };
 
-const WALKABLE = new Set(["grass", "path", "markerA", "marker", "sweetheart"]);
+const WALKABLE = new Set(["grass", "path", "bridge", "markerA", "marker", "sweetheart"]);
 
 function carveBuilding(grid, b) {
   for (let y = b.y; y < b.y + b.h; y++) {
     for (let x = b.x; x < b.x + b.w; x++) {
       grid[y][x] = "building";
     }
+  }
+}
+
+function carveLake(grid, lake) {
+  for (let y = lake.cy - lake.ry; y <= lake.cy + lake.ry; y++) {
+    for (let x = lake.cx - lake.rx; x <= lake.cx + lake.rx; x++) {
+      const nx = (x - lake.cx) / lake.rx;
+      const ny = (y - lake.cy) / lake.ry;
+      if (nx * nx + ny * ny <= 1 && grid[y] && grid[y][x] !== undefined) {
+        grid[y][x] = "water";
+      }
+    }
+  }
+}
+
+function carveBridge(grid, lake, y) {
+  const xStart = lake.cx - lake.rx - 1;
+  const xEnd = lake.cx + lake.rx + 1;
+  for (let x = xStart; x <= xEnd; x++) {
+    if (grid[y] && grid[y][x] !== undefined) grid[y][x] = "bridge";
   }
 }
 
@@ -94,14 +135,21 @@ function buildLevel() {
     grid.push(row);
   }
 
+  carveLake(grid, LAKE);
+  carveBridge(grid, LAKE, BRIDGE_Y);
+
   const labels = [];
   DECOR_BUILDINGS.forEach((b) => {
     carveBuilding(grid, b);
     labels.push({ x: b.x, y: b.y - 1, text: b.label });
   });
 
+  TREE_SPOTS.forEach((t) => {
+    if (grid[t.y][t.x] === "grass") grid[t.y][t.x] = "wall";
+  });
+
   const stopTiles = new Map(); // "x,y" -> entrada de TIMELINE
-  const orderedStops = [];
+  const stopMarks = {}; // id -> {x,y}
 
   TIMELINE.forEach((entry) => {
     const place = LEVEL_PLACES[entry.id];
@@ -119,7 +167,7 @@ function buildLevel() {
 
     grid[markY][markX] = "marker";
     stopTiles.set(`${markX},${markY}`, entry);
-    orderedStops.push({ x: markX, y: markY });
+    stopMarks[entry.id] = { x: markX, y: markY };
   });
 
   const entrada = LEVEL_PLACES.entrada;
@@ -128,31 +176,44 @@ function buildLevel() {
   const b3 = LEVEL_PLACES.bloque3;
   carveBuilding(grid, b3);
   labels.push({ x: b3.x, y: b3.y - 1, text: "Bloque 3" });
-  const b3X = b3.x + Math.floor(b3.w / 2);
-  const b3Y = b3.y - 1; // tile justo enfrente (arriba) de la entrada del edificio
-  grid[b3Y][b3X] = "sweetheart";
+  const sweetheart = { x: b3.x + Math.floor(b3.w / 2) + 1, y: b3.y - 1 };
+  grid[sweetheart.y][sweetheart.x] = "sweetheart";
 
-  // Camino visual conectando entrada -> paradas -> bloque 3 (en línea recta
-  // entre puntos consecutivos; es solo estético, se puede caminar por
-  // cualquier parte del pasto igual).
-  const route = [entrada, ...orderedStops, { x: b3X, y: b3Y }];
+  // Camino visual conectando entrada -> paradas -> bloque 3 (solo
+  // estético: se puede caminar por cualquier parte del pasto igual).
+  // Los waypoints intermedios rodean los edificios de Cafetería y
+  // Bloque 3 en vez de cruzarlos en línea recta.
+  const route = [
+    entrada,
+    stopMarks.hogares,
+    stopMarks.mar_caribe,
+    { x: 6, y: 21 },
+    { x: 2, y: 21 },
+    { x: 2, y: 25 },
+    stopMarks.cafeteria,
+    { x: 25, y: 25 },
+    { x: 25, y: 21 },
+    stopMarks.bloque3_atras,
+    sweetheart,
+  ].filter(Boolean);
+
   for (let i = 0; i < route.length - 1; i++) {
     paintPath(grid, route[i].x, route[i].y, route[i + 1].x, route[i + 1].y);
   }
 
-  return { grid, labels, stopTiles, entrada, sweetheart: { x: b3X, y: b3Y } };
+  return { grid, labels, stopTiles, entrada, sweetheart };
 }
 
 // ---------------------------------------------------------------------
 // Escena: título
 // ---------------------------------------------------------------------
 k.scene("title", () => {
-  k.add([k.rect(VIEW_COLS * TILE, ROWS * TILE), k.pos(0, 0), k.color(30, 30, 45)]);
+  k.add([k.rect(VIEW_COLS * TILE, VIEW_ROWS * TILE), k.pos(0, 0), k.color(30, 30, 45)]);
   k.add([k.text(TITLE_SCREEN.title, { size: 16, width: VIEW_COLS * TILE - 32 }), k.pos(16, 40), k.color(255, 255, 255)]);
   k.add([k.text(TITLE_SCREEN.subtitle, { size: 8 }), k.pos(16, 90), k.color(200, 200, 220)]);
   k.add([
     k.text("Presioná Espacio para empezar", { size: 8 }),
-    k.pos(16, ROWS * TILE - 32),
+    k.pos(16, VIEW_ROWS * TILE - 32),
     k.color(255, 220, 120),
   ]);
   k.onKeyPress("space", () => k.go("game"));
@@ -198,7 +259,7 @@ k.scene("game", () => {
     const boxW = VIEW_COLS * TILE - 16;
     const boxH = 52;
     const boxX = 8;
-    const boxY = ROWS * TILE - boxH - 6;
+    const boxY = VIEW_ROWS * TILE - boxH - 6;
 
     const elements = [
       k.add([k.rect(boxW, boxH), k.pos(boxX, boxY), k.color(20, 20, 30), k.fixed(), k.z(100)]),
@@ -280,12 +341,16 @@ k.scene("game", () => {
   k.onKeyPress("w", () => tryMove(0, -1));
   k.onKeyPress("s", () => tryMove(0, 1));
 
-  const halfView = (VIEW_COLS * TILE) / 2;
-  const minCamX = halfView;
-  const maxCamX = COLS * TILE - halfView;
+  const halfViewX = (VIEW_COLS * TILE) / 2;
+  const halfViewY = (VIEW_ROWS * TILE) / 2;
+  const minCamX = halfViewX;
+  const maxCamX = COLS * TILE - halfViewX;
+  const minCamY = halfViewY;
+  const maxCamY = ROWS * TILE - halfViewY;
   k.onUpdate(() => {
     const camX = k.clamp(player.pos.x, minCamX, maxCamX);
-    k.setCamPos(k.vec2(camX, (ROWS * TILE) / 2));
+    const camY = k.clamp(player.pos.y, minCamY, maxCamY);
+    k.setCamPos(k.vec2(camX, camY));
   });
 });
 
@@ -293,14 +358,14 @@ k.scene("game", () => {
 // Escena: final
 // ---------------------------------------------------------------------
 k.scene("ending", () => {
-  k.add([k.rect(VIEW_COLS * TILE, ROWS * TILE), k.pos(0, 0), k.color(45, 22, 32)]);
+  k.add([k.rect(VIEW_COLS * TILE, VIEW_ROWS * TILE), k.pos(0, 0), k.color(45, 22, 32)]);
   k.add([k.text(ENDING.title, { size: 14 }), k.pos(16, 26), k.color(255, 255, 255)]);
   k.add([
     k.text(ENDING.text, { size: 8, width: VIEW_COLS * TILE - 32 }),
     k.pos(16, 54),
     k.color(255, 210, 220),
   ]);
-  k.add([k.text("Feliz aniversario <3", { size: 10 }), k.pos(16, ROWS * TILE - 26), k.color(255, 180, 200)]);
+  k.add([k.text("Feliz aniversario <3", { size: 10 }), k.pos(16, VIEW_ROWS * TILE - 26), k.color(255, 180, 200)]);
 });
 
 k.go("title");

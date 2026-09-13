@@ -1,4 +1,4 @@
-import { TIMELINE, LOCKED, REUNION, ENDING, TITLE_SCREEN } from "./timeline.js";
+import { TIMELINE, LOCKED, REUNION, ENDING, TITLE_SCREEN, INTRO } from "./timeline.js";
 
 // ---------------------------------------------------------------------
 // Config del mapa
@@ -25,9 +25,17 @@ const LEVEL_PLACES = {
   cienaga: { x: 38, y: 16, w: 12, h: 6 },
   sierra_nevada: { x: 38, y: 26, w: 14, h: 6 },
   cafeteria: { x: 6, y: 46, w: 12, h: 6 },
-  bloque3_atras: { x: 57, y: 44 },
-  bloque3: { x: 52, y: 46, w: 10, h: 6 },
+  // El fragmento 6 pasa EN el Bloque 3 (la niña de pequeña); el
+  // reencuentro con vos pasa DETRÁS del edificio (ver BLOQUE3_BUILDING).
+  bloque3: { x: 57, y: 44 },
 };
+
+// El edificio del Bloque 3 en sí: solo se usa para dibujarlo y para
+// calcular dónde va el punto de reencuentro (justo detrás/al lado).
+const BLOQUE3_BUILDING = { x: 52, y: 46, w: 10, h: 6 };
+
+// Pequeño guiño para el chiste de Tiana: un sapito cerca del lago.
+const FROG_SPOT = { x: 18, y: 27 };
 
 // Edificios decorativos (sin diálogo), solo para que el campus se sienta
 // más completo. Se pueden ajustar libremente sin romper nada.
@@ -206,7 +214,7 @@ function buildLevel() {
   const entrada = LEVEL_PLACES.entrada;
   grid[entrada.y][entrada.x] = "markerA";
 
-  const b3 = LEVEL_PLACES.bloque3;
+  const b3 = BLOQUE3_BUILDING;
   carveBuilding(grid, b3);
   labels.push({ x: b3.x, y: b3.y - 1, text: "Bloque 3" });
   const sweetheart = { x: b3.x + Math.floor(b3.w / 2) + 1, y: b3.y - 1 };
@@ -230,7 +238,7 @@ function buildLevel() {
     { x: 12, y: BELOW_ROW },
     { x: 49, y: BELOW_ROW },
     { x: 49, y: 44 },
-    stopMarks.bloque3_atras,
+    stopMarks.bloque3,
     sweetheart,
   ].filter(Boolean);
 
@@ -243,7 +251,7 @@ function buildLevel() {
   paintDiagonal(grid, 36, 10, 34, 34);
   paintDiagonal(grid, 11, 25, 20, 38);
 
-  return { grid, labels, stopTiles, entrada, sweetheart };
+  return { grid, labels, stopTiles, stopMarks, entrada, sweetheart };
 }
 
 // ---------------------------------------------------------------------
@@ -265,7 +273,7 @@ k.scene("title", () => {
 // Escena: juego
 // ---------------------------------------------------------------------
 k.scene("game", () => {
-  const { grid, labels, stopTiles, entrada, sweetheart } = buildLevel();
+  const { grid, labels, stopTiles, stopMarks, entrada, sweetheart } = buildLevel();
 
   // Solo se crean objetos para tiles que NO son pasto liso (el pasto ya
   // es el color de fondo) — así el mapa puede ser grande sin que el
@@ -290,6 +298,14 @@ k.scene("game", () => {
     k.add([k.text(l.text, { size: 6 }), k.pos(l.x * TILE, l.y * TILE + 2), k.color(230, 230, 235), k.z(5)]);
   });
 
+  // Guiño a Tiana: un sapito escondido cerca del lago.
+  k.add([
+    k.text("R", { size: 7 }),
+    k.pos(FROG_SPOT.x * TILE + 3, FROG_SPOT.y * TILE - 1),
+    k.color(60, 140, 60),
+    k.z(6),
+  ]);
+
   const player = k.add([
     k.rect(TILE - 2, TILE - 2),
     k.pos(entrada.x * TILE + 1, entrada.y * TILE + 1),
@@ -309,14 +325,58 @@ k.scene("game", () => {
     k.z(200),
   ]);
 
+  // ---- Mini-mapa (arriba a la derecha): dónde está cada fragmento y
+  // dónde estás vos ----
+  const MINI_W = 110;
+  const MINI_H = 80;
+  const miniX = VIEW_COLS * TILE - MINI_W - 6;
+  const miniY = 6;
+  const miniScaleX = MINI_W / COLS;
+  const miniScaleY = MINI_H / ROWS;
+
+  k.add([k.rect(MINI_W, MINI_H), k.pos(miniX, miniY), k.color(20, 40, 24), k.fixed(), k.z(199)]);
+
+  const miniDots = {};
+  TIMELINE.forEach((entry) => {
+    const pos = stopMarks[entry.id];
+    if (!pos) return;
+    miniDots[entry.id] = k.add([
+      k.rect(3, 3),
+      k.pos(miniX + pos.x * miniScaleX, miniY + pos.y * miniScaleY),
+      k.color(...COLORS.marker),
+      k.fixed(),
+      k.z(201),
+    ]);
+  });
+  k.add([
+    k.rect(4, 4),
+    k.pos(miniX + sweetheart.x * miniScaleX, miniY + sweetheart.y * miniScaleY),
+    k.color(...COLORS.sweetheart),
+    k.fixed(),
+    k.z(201),
+  ]);
+  const miniPlayerDot = k.add([
+    k.rect(3, 3),
+    k.pos(miniX, miniY),
+    k.color(...COLORS.player),
+    k.fixed(),
+    k.z(202),
+  ]);
+
   let dialogOpen = false;
 
-  function showDialog(title, subtitle, text, onClose) {
+  // "content" puede ser un solo texto o un array de textos: cada uno es
+  // una pantalla, se avanza de una a otra con Espacio.
+  function showDialog(title, subtitle, content, onClose) {
     dialogOpen = true;
+    const pages = Array.isArray(content) ? content : [content];
+    let pageIndex = 0;
+
     const boxW = VIEW_COLS * TILE - 16;
     const boxH = 52;
     const boxX = 8;
     const boxY = VIEW_ROWS * TILE - boxH - 6;
+    const textY = boxY + (subtitle ? 27 : 18);
 
     const elements = [
       k.add([k.rect(boxW, boxH), k.pos(boxX, boxY), k.color(20, 20, 30), k.fixed(), k.z(100)]),
@@ -330,14 +390,15 @@ k.scene("game", () => {
       );
     }
 
+    const textEl = k.add([
+      k.text(pages[0], { size: 7, width: boxW - 16 }),
+      k.pos(boxX + 8, textY),
+      k.color(30, 30, 30),
+      k.z(102),
+      k.fixed(),
+    ]);
+    elements.push(textEl);
     elements.push(
-      k.add([
-        k.text(text, { size: 7, width: boxW - 16 }),
-        k.pos(boxX + 8, boxY + (subtitle ? 27 : 18)),
-        k.color(30, 30, 30),
-        k.z(102),
-        k.fixed(),
-      ]),
       k.add([
         k.text("Espacio para continuar", { size: 6 }),
         k.pos(boxX + 8, boxY + boxH - 10),
@@ -348,6 +409,11 @@ k.scene("game", () => {
     );
 
     const handler = k.onKeyPress("space", () => {
+      pageIndex++;
+      if (pageIndex < pages.length) {
+        textEl.text = pages[pageIndex];
+        return;
+      }
       elements.forEach((e) => k.destroy(e));
       dialogOpen = false;
       handler.cancel();
@@ -360,10 +426,11 @@ k.scene("game", () => {
     if (stopTiles.has(key)) {
       const entry = stopTiles.get(key);
       const isNew = !collected.has(entry.id);
-      showDialog(entry.npc || entry.place, entry.place, entry.text, () => {
+      showDialog(entry.npc || entry.place, entry.place, entry.pages, () => {
         if (!isNew) return;
         collected.add(entry.id);
         counter.text = `Fragmentos: ${collected.size}/${TOTAL_FRAGMENTS}`;
+        if (miniDots[entry.id]) miniDots[entry.id].color = k.rgb(150, 150, 150);
         showDialog("¡Conseguiste un objeto!", null, entry.item);
       });
       return;
@@ -373,7 +440,7 @@ k.scene("game", () => {
         showDialog("...", null, LOCKED.text);
         return;
       }
-      showDialog("♥", null, REUNION.text, () => k.go("ending"));
+      showDialog("♥", null, REUNION.pages, () => k.go("ending"));
     }
   }
 
@@ -418,7 +485,14 @@ k.scene("game", () => {
     const camX = k.clamp(player.pos.x, minCamX, maxCamX);
     const camY = k.clamp(player.pos.y, minCamY, maxCamY);
     k.setCamPos(k.vec2(camX, camY));
+    miniPlayerDot.pos = k.vec2(
+      miniX + (player.pos.x / TILE) * miniScaleX,
+      miniY + (player.pos.y / TILE) * miniScaleY
+    );
   });
+
+  // Mensaje de bienvenida + mini tutorial, antes de poder moverte.
+  showDialog("", null, INTRO.pages);
 });
 
 // ---------------------------------------------------------------------
@@ -426,10 +500,21 @@ k.scene("game", () => {
 // ---------------------------------------------------------------------
 k.scene("ending", () => {
   k.add([k.rect(VIEW_COLS * TILE, VIEW_ROWS * TILE), k.pos(0, 0), k.color(45, 22, 32)]);
-  k.add([k.text(ENDING.title, { size: 14 }), k.pos(16, 26), k.color(255, 255, 255)]);
+
+  // Los dos personajes se acercan y se encuentran en el medio.
+  const midX = (VIEW_COLS * TILE) / 2;
+  const animY = 20;
+  const her = k.add([k.rect(10, 10), k.pos(10, animY), k.color(...COLORS.sweetheart), k.z(10)]);
+  const him = k.add([k.rect(10, 10), k.pos(VIEW_COLS * TILE - 20, animY), k.color(...COLORS.player), k.z(10)]);
+  k.tween(her.pos, k.vec2(midX - 12, animY), 1, (p) => (her.pos = p), k.easings.easeOutQuad);
+  k.tween(him.pos, k.vec2(midX + 2, animY), 1, (p) => (him.pos = p), k.easings.easeOutQuad).onEnd(() => {
+    k.add([k.text("♥", { size: 12 }), k.pos(midX - 5, animY - 14), k.color(230, 60, 110), k.z(11)]);
+  });
+
+  k.add([k.text(ENDING.title, { size: 14 }), k.pos(16, 48), k.color(255, 255, 255)]);
   k.add([
     k.text(ENDING.text, { size: 8, width: VIEW_COLS * TILE - 32 }),
-    k.pos(16, 54),
+    k.pos(16, 74),
     k.color(255, 210, 220),
   ]);
   k.add([k.text("Feliz aniversario <3", { size: 10 }), k.pos(16, VIEW_ROWS * TILE - 26), k.color(255, 180, 200)]);

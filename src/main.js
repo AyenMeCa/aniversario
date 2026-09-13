@@ -262,7 +262,7 @@ k.scene("title", () => {
   k.add([k.text(TITLE_SCREEN.title, { size: 16, width: VIEW_COLS * TILE - 32 }), k.pos(16, 40), k.color(255, 255, 255)]);
   k.add([k.text(TITLE_SCREEN.subtitle, { size: 8 }), k.pos(16, 90), k.color(200, 200, 220)]);
   k.add([
-    k.text("Presioná Espacio para empezar", { size: 8 }),
+    k.text("Presiona Espacio para empezar", { size: 8 }),
     k.pos(16, VIEW_ROWS * TILE - 32),
     k.color(255, 220, 120),
   ]);

@@ -8,12 +8,12 @@
 // (ahí está la posición en el mapa).
 //
 // "pages" es un array: cada elemento es una pantalla de diálogo, se
-// avanza de una a la otra con Espacio (como cualquier RPG). Podés poner
-// solo una si no necesitás varias.
+// avanza de una a la otra con Espacio (como cualquier RPG). Puedes poner
+// solo una si no necesitas varias.
 //
 // Hay que juntar TODOS los fragmentos de esta lista para poder acceder
 // al Bloque 3 y encontrarte con ella. Si más adelante se te ocurre un
-// lugar nuevo, avisame en el chat y lo agregamos acá + su posición.
+// lugar nuevo, avísame en el chat y lo agregamos acá + su posición.
 // ---------------------------------------------------------------------
 
 export const TIMELINE = [
@@ -23,9 +23,9 @@ export const TIMELINE = [
     npc: "Namjoon (BTS)",
     pages: [
       "Annyeonghaseyo! 안녕하세요, 반가워요...",
-      "(No entendés nada de lo que dice. Sacás el teléfono para traducir.)",
-      "Ah, perdón — ¡hola! Tu novio me pidió que te esperara acá. Sos súper fan nuestra, ¿no? Qué lindo conocerte.",
-      "Lamento no poder quedarme más — el resto del grupo me espera, salimos de gira hoy mismo. Pero antes, tomá esto.",
+      "(No entiendes nada de lo que dice. Sacas el teléfono para traducir.)",
+      "Ah, perdón — ¡hola! Tu novio me pidió que te esperara acá. Eres súper fan nuestra, ¿no? Qué lindo conocerte.",
+      "Lamento no poder quedarme más — el resto del grupo me espera, salimos de gira hoy mismo. Pero antes, toma esto.",
       "Tu novio te está esperando en algún lugar de la universidad... la verdad no recuerdo bien dónde. Pero en la Zona de los Hogares alguien sabe más que yo.",
     ],
     item: "Un Army Bomb",
@@ -68,8 +68,8 @@ export const TIMELINE = [
     place: "Edificio Sierra Nevada",
     npc: "Bibi (Brawl Stars)",
     pages: [
-      "¡Hey! ¿Buscás a tu novio? No sé exactamente dónde está, ¡pero conozco a alguien que seguro sí!",
-      "En el Bloque 3 vas a encontrar la última pista. ¡Andá para allá y pegale con todo, como un home run!",
+      "¡Hey! ¿Buscas a tu novio? No sé exactamente dónde está, ¡pero conozco a alguien que seguro sí!",
+      "En el Bloque 3 vas a encontrar la última pista. ¡Ve para allá y dale con todo, como un home run!",
     ],
     item: "TODO: nombre de un objeto especial (algo de Bibi/Brawl Stars, ej. su bate o una estrella)",
   },
@@ -82,13 +82,13 @@ export const TIMELINE = [
   },
 ];
 
-// Lo que se muestra si llegás detrás del Bloque 3 sin haber juntado
+// Lo que se muestra si llega detrás del Bloque 3 sin haber juntado
 // todos los fragmentos todavía.
 export const LOCKED = {
   text: "Todavía faltan recuerdos por encontrar antes de poder verla...",
 };
 
-// El reencuentro: lo que decís vos cuando la ves esperándote detrás del
+// El reencuentro: lo que dices tú cuando la ves esperándote detrás del
 // Bloque 3 (con todos los fragmentos ya juntados), antes del mensaje
 // final. Puede ser una sola pantalla o varias (array).
 export const REUNION = {
@@ -111,7 +111,7 @@ export const TITLE_SCREEN = {
 // mensaje + un mini tutorial de controles.
 export const INTRO = {
   pages: [
-    "Hoy es nuestro aniversario. Quiero regalarte algo distinto: un recorrido por los lugares que nos formaron como pareja. Juntá los recuerdos que dejé por el camino y descubrí dónde encontrarme.",
-    "Usá las flechas o WASD para moverte. Acercate a los que tengan un ¡ para hablar con ellos. Cuando juntes los 6 fragmentos, andá al Bloque 3.",
+    "Hoy es nuestro aniversario. Quiero regalarte algo distinto: un recorrido por los lugares que nos formaron como pareja. Junta los recuerdos que dejé por el camino y descubre dónde encontrarme.",
+    "Usa las flechas o WASD para moverte. Acércate a los que tengan un ¡ para hablar con ellos. Cuando juntes los 6 fragmentos, ve al Bloque 3.",
   ],
 };

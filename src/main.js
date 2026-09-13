@@ -20,7 +20,7 @@ const MOVE_TIME = 0.12;
 // un edificio real.
 const LEVEL_PLACES = {
   entrada: { x: 4, y: 12 },
-  hogares: { x: 6, y: 4, w: 12, h: 6 },
+  hangares: { x: 6, y: 4, w: 12, h: 6 },
   mar_caribe: { x: 30, y: 4, w: 12, h: 6 },
   cienaga: { x: 38, y: 16, w: 12, h: 6 },
   sierra_nevada: { x: 38, y: 26, w: 14, h: 6 },
@@ -225,12 +225,12 @@ function buildLevel() {
   const BELOW_ROW = ROWS - 3;
 
   // Ruta principal (garantiza que se pueda llegar a cada parada):
-  // horizontal arriba (Hogares -> Mar Caribe), un tramo vertical largo
+  // horizontal arriba (Hangares -> Mar Caribe), un tramo vertical largo
   // bajando por el costado despejado del lago/Ciénaga/Sierra Nevada, y
   // horizontal abajo para entrar a cada edificio desde su frente.
   const route = [
     entrada,
-    stopMarks.hogares,
+    stopMarks.hangares,
     stopMarks.mar_caribe,
     { x: 36, y: BELOW_ROW },
     { x: 12, y: BELOW_ROW },

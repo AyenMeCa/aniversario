@@ -412,14 +412,17 @@ k.scene("game", () => {
     });
   }
 
-  k.onKeyPress("left", () => tryMove(-1, 0));
-  k.onKeyPress("right", () => tryMove(1, 0));
-  k.onKeyPress("up", () => tryMove(0, -1));
-  k.onKeyPress("down", () => tryMove(0, 1));
-  k.onKeyPress("a", () => tryMove(-1, 0));
-  k.onKeyPress("d", () => tryMove(1, 0));
-  k.onKeyPress("w", () => tryMove(0, -1));
-  k.onKeyPress("s", () => tryMove(0, 1));
+  // onKeyDown (no onKeyPress) para que mantener la tecla apretada mueva
+  // sin cortes: se dispara todos los frames mientras está apretada, y
+  // tryMove ya se encarga de esperar a que termine el paso anterior.
+  k.onKeyDown("left", () => tryMove(-1, 0));
+  k.onKeyDown("right", () => tryMove(1, 0));
+  k.onKeyDown("up", () => tryMove(0, -1));
+  k.onKeyDown("down", () => tryMove(0, 1));
+  k.onKeyDown("a", () => tryMove(-1, 0));
+  k.onKeyDown("d", () => tryMove(1, 0));
+  k.onKeyDown("w", () => tryMove(0, -1));
+  k.onKeyDown("s", () => tryMove(0, 1));
 
   const halfViewX = (VIEW_COLS * TILE) / 2;
   const halfViewY = (VIEW_ROWS * TILE) / 2;

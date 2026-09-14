@@ -4,64 +4,77 @@ import { TIMELINE, LOCKED, REUNION, ENDING, TITLE_SCREEN, INTRO } from "./timeli
 // Config del mapa
 // ---------------------------------------------------------------------
 const TILE = 16;
-const COLS = 76; // ancho total del campus (en tiles) — bien amplio
-const ROWS = 56; // alto total del campus (en tiles)
+const COLS = 140; // ancho total del campus (en tiles)
+const ROWS = 100; // alto total del campus (en tiles)
 const VIEW_COLS = 22; // cuánto se ve en pantalla (la cámara hace scroll)
 const VIEW_ROWS = 16;
 const SCALE = 3;
 const MOVE_TIME = 0.12;
 
-// Mapa estilizado a partir del bosquejo del campus real (no es
-// geográficamente exacto, pero respeta la posición relativa de cada
-// zona, y la distancia entre Mar Caribe y el Bloque 3 es bien grande
-// para que se sienta como esos ~5 minutos de caminata reales).
-// "w"/"h" = tamaño del edificio en tiles; los lugares de la historia
-// (los que están en TIMELINE) no llevan "w"/"h" salvo que representen
-// un edificio real.
-const LEVEL_PLACES = {
-  entrada: { x: 4, y: 12 },
-  hangares: { x: 6, y: 4, w: 12, h: 6 },
-  mar_caribe: { x: 30, y: 4, w: 12, h: 6 },
-  cienaga: { x: 38, y: 16, w: 12, h: 6 },
-  sierra_nevada: { x: 38, y: 26, w: 14, h: 6 },
-  cafeteria: { x: 6, y: 46, w: 12, h: 6 },
-  // El fragmento 6 pasa EN el Bloque 3 (la niña de pequeña); el
-  // reencuentro con vos pasa DETRÁS del edificio (ver BLOQUE3_BUILDING).
-  bloque3: { x: 57, y: 44 },
-};
-
-// El edificio del Bloque 3 en sí: solo se usa para dibujarlo y para
-// calcular dónde va el punto de reencuentro (justo detrás/al lado).
-const BLOQUE3_BUILDING = { x: 52, y: 46, w: 10, h: 6 };
-
-// Pequeño guiño para el chiste de Tiana: un sapito cerca del lago.
-const FROG_SPOT = { x: 18, y: 27 };
-
-// Edificios decorativos (sin diálogo), solo para que el campus se sienta
-// más completo. Se pueden ajustar libremente sin romper nada.
-const DECOR_BUILDINGS = [
-  { x: 2, y: 16, w: 10, h: 10, label: "Gorgona (Bloque 8)" },
-  { x: 20, y: 38, w: 10, h: 6, label: "Biblioteca" },
-  { x: 24, y: 46, w: 10, h: 6, label: "Bloque de aulas" },
-  { x: 38, y: 46, w: 10, h: 6, label: "Bloque de aulas" },
+// ---------------------------------------------------------------------
+// MAPA COMO DATOS (para poder reemplazarlo después)
+// ---------------------------------------------------------------------
+// Todo lo que se ve en el mapa (edificios, lago, isla, caminos) está
+// descrito acá como datos simples, no "dibujado a mano". Cada edificio
+// tiene un campo "sprite" que hoy vale null (por eso se dibuja como un
+// rectángulo de color) — el día que tengas la textura pixelada de ese
+// edificio, alcanza con poner acá `sprite: "nombre-del-archivo"` y
+// cambiar UNA sola función (drawBuilding, más abajo) para que dibuje la
+// imagen en vez del rectángulo. El resto del juego (mapa, movimiento,
+// diálogos) no se toca.
+//
+// Edificios con id que coincide con un fragmento de TIMELINE (en
+// src/timeline.js) quedan interactivos automáticamente: el juego les
+// pone un marcador enfrente y un diálogo. Los que tienen "label" propio
+// son solo decorativos.
+const BUILDINGS = [
+  { id: "hangares", x: 8, y: 6, w: 20, h: 10, sprite: null },
+  { id: "mar_caribe", x: 55, y: 6, w: 20, h: 10, sprite: null },
+  { id: "cienaga", x: 85, y: 30, w: 20, h: 10, sprite: null },
+  { id: "sierra_nevada", x: 85, y: 44, w: 22, h: 10, sprite: null },
+  { id: "cafeteria", x: 33, y: 75, w: 18, h: 10, sprite: null },
+  { id: "bloque8", x: 6, y: 30, w: 22, h: 26, label: "Bloque 8", sprite: null },
+  { id: "biblioteca", x: 58, y: 80, w: 18, h: 10, label: "Biblioteca", sprite: null },
+  { id: "otros_bloques", x: 95, y: 88, w: 18, h: 10, label: "Otros Bloques", sprite: null },
 ];
 
-// El lago (con su puente) que aparece en el bosquejo, solo de ambiente.
-const LAKE = { cx: 22, cy: 22, rx: 8, ry: 8 };
-const BRIDGE_Y = 22;
+// El Bloque 3 se maneja aparte porque el fragmento 6 (la niña de
+// pequeña) queda EN el edificio, y el punto de reencuentro con vos
+// queda justo DETRÁS/al lado — ver comentario más abajo en buildLevel().
+const BLOQUE3_BUILDING = { id: "bloque3", x: 10, y: 88, w: 18, h: 10, label: "Bloque 3", sprite: null };
 
-// Árboles sueltos, también solo de ambiente.
+const ENTRADA = { x: 40, y: 4 };
+
+// El lago (union de dos óvalos para que la forma no sea un círculo
+// perfecto, como en el bosquejo) + la mini isla del medio + los
+// puentes que cruzan. Mismo criterio: "sprite: null" por ahora.
+const LAKE_SHAPES = [
+  { cx: 50, cy: 45, rx: 18, ry: 16, sprite: null },
+  { cx: 62, cy: 56, rx: 14, ry: 14, sprite: null },
+];
+const ISLAND = { cx: 58, cy: 58, r: 5, sprite: null };
+const BRIDGE_Y = 48;
+const BRIDGE_X_START = 28;
+const BRIDGE_X_END = 80;
+const ISLAND_BRIDGE_X = 58;
+
+// Pequeño guiño para el chiste de Tiana: un sapito en el lago.
+const FROG_SPOT = { x: 68, y: 60 };
+
+// Árboles sueltos, solo de ambiente.
 const TREE_SPOTS = [
-  { x: 24, y: 6 },
-  { x: 55, y: 6 },
-  { x: 45, y: 12 },
-  { x: 65, y: 20 },
-  { x: 60, y: 30 },
-  { x: 33, y: 40 },
-  { x: 44, y: 40 },
-  { x: 65, y: 44 },
-  { x: 60, y: 10 },
-  { x: 8, y: 40 },
+  { x: 30, y: 10 },
+  { x: 80, y: 10 },
+  { x: 110, y: 20 },
+  { x: 120, y: 45 },
+  { x: 118, y: 60 },
+  { x: 115, y: 65 },
+  { x: 45, y: 70 },
+  { x: 70, y: 72 },
+  { x: 120, y: 80 },
+  { x: 55, y: 95 },
+  { x: 15, y: 20 },
+  { x: 100, y: 15 },
 ];
 
 const k = kaplay({
@@ -102,22 +115,36 @@ function carveBuilding(grid, b) {
   }
 }
 
-function carveLake(grid, lake) {
-  for (let y = lake.cy - lake.ry; y <= lake.cy + lake.ry; y++) {
-    for (let x = lake.cx - lake.rx; x <= lake.cx + lake.rx; x++) {
-      const nx = (x - lake.cx) / lake.rx;
-      const ny = (y - lake.cy) / lake.ry;
+function carveEllipse(grid, shape, type) {
+  for (let y = shape.cy - shape.ry; y <= shape.cy + shape.ry; y++) {
+    for (let x = shape.cx - shape.rx; x <= shape.cx + shape.rx; x++) {
+      const nx = (x - shape.cx) / shape.rx;
+      const ny = (y - shape.cy) / shape.ry;
       if (nx * nx + ny * ny <= 1 && grid[y] && grid[y][x] !== undefined) {
-        grid[y][x] = "water";
+        grid[y][x] = type;
       }
     }
   }
 }
 
-function carveBridge(grid, lake, y) {
-  const xStart = lake.cx - lake.rx - 1;
-  const xEnd = lake.cx + lake.rx + 1;
+function carveCircle(grid, shape, type) {
+  for (let y = shape.cy - shape.r; y <= shape.cy + shape.r; y++) {
+    for (let x = shape.cx - shape.r; x <= shape.cx + shape.r; x++) {
+      if (Math.hypot(x - shape.cx, y - shape.cy) <= shape.r && grid[y] && grid[y][x] !== undefined) {
+        grid[y][x] = type;
+      }
+    }
+  }
+}
+
+function carveHorizontalBridge(grid, y, xStart, xEnd) {
   for (let x = xStart; x <= xEnd; x++) {
+    if (grid[y] && grid[y][x] !== undefined) grid[y][x] = "bridge";
+  }
+}
+
+function carveVerticalBridge(grid, x, yStart, yEnd) {
+  for (let y = yStart; y <= yEnd; y++) {
     if (grid[y] && grid[y][x] !== undefined) grid[y][x] = "bridge";
   }
 }
@@ -140,8 +167,8 @@ function paintPath(grid, x1, y1, x2, y2) {
 
 // Camino en diagonal (línea recta), para los senderos que cortan campo
 // abierto como en el bosquejo. Es solo decorativo: si se cruza con un
-// edificio, esa porción simplemente no se pinta (el resto del camino
-// sigue funcionando igual).
+// edificio o el agua, esa porción simplemente no se pinta (el resto del
+// camino sigue funcionando igual).
 function paintDiagonal(grid, x1, y1, x2, y2) {
   const dx = Math.abs(x2 - x1);
   const dy = Math.abs(y2 - y1);
@@ -176,69 +203,77 @@ function buildLevel() {
     grid.push(row);
   }
 
-  carveLake(grid, LAKE);
-  carveBridge(grid, LAKE, BRIDGE_Y);
-
-  const labels = [];
-  DECOR_BUILDINGS.forEach((b) => {
-    carveBuilding(grid, b);
-    labels.push({ x: b.x, y: b.y - 1, text: b.label });
-  });
+  LAKE_SHAPES.forEach((shape) => carveEllipse(grid, shape, "water"));
+  carveCircle(grid, ISLAND, "grass"); // la mini isla, en medio del lago
+  carveHorizontalBridge(grid, BRIDGE_Y, BRIDGE_X_START, BRIDGE_X_END);
+  carveVerticalBridge(grid, ISLAND_BRIDGE_X, BRIDGE_Y, ISLAND.cy - ISLAND.r);
 
   TREE_SPOTS.forEach((t) => {
     if (grid[t.y][t.x] === "grass") grid[t.y][t.x] = "wall";
   });
 
+  const labels = [];
   const stopTiles = new Map(); // "x,y" -> entrada de TIMELINE
   const stopMarks = {}; // id -> {x,y}
 
-  TIMELINE.forEach((entry) => {
-    const place = LEVEL_PLACES[entry.id];
-    if (!place) return;
-
-    let markX = place.x;
-    let markY = place.y;
-
-    if (place.w) {
-      carveBuilding(grid, place);
-      labels.push({ x: place.x, y: place.y - 1, text: entry.place });
-      markX = place.x + Math.floor(place.w / 2);
-      markY = place.y + place.h;
+  // Edificios: los que tienen un fragmento de historia con el mismo id
+  // quedan interactivos (marcador + diálogo al frente); el resto son
+  // solo ambientación.
+  BUILDINGS.forEach((b) => {
+    carveBuilding(grid, b);
+    const entry = TIMELINE.find((t) => t.id === b.id);
+    if (entry) {
+      labels.push({ x: b.x, y: b.y - 1, text: entry.place });
+      const markX = b.x + Math.floor(b.w / 2);
+      const markY = b.y + b.h;
+      grid[markY][markX] = "marker";
+      stopTiles.set(`${markX},${markY}`, entry);
+      stopMarks[b.id] = { x: markX, y: markY };
+    } else {
+      labels.push({ x: b.x, y: b.y - 1, text: b.label });
     }
-
-    grid[markY][markX] = "marker";
-    stopTiles.set(`${markX},${markY}`, entry);
-    stopMarks[entry.id] = { x: markX, y: markY };
   });
 
-  const entrada = LEVEL_PLACES.entrada;
+  const entrada = ENTRADA;
   grid[entrada.y][entrada.x] = "markerA";
 
+  // El Bloque 3: el fragmento 6 (niña de pequeña) tiene su marcador
+  // justo enfrente del edificio, y el punto de reencuentro con vos
+  // queda al lado — ambos del mismo costado para que el camino los
+  // pueda alcanzar sin cruzar el edificio.
   const b3 = BLOQUE3_BUILDING;
   carveBuilding(grid, b3);
-  labels.push({ x: b3.x, y: b3.y - 1, text: "Bloque 3" });
-  const sweetheart = { x: b3.x + Math.floor(b3.w / 2) + 1, y: b3.y - 1 };
+  labels.push({ x: b3.x, y: b3.y - 1, text: b3.label });
+  const bloque3Mark = { x: b3.x + Math.floor(b3.w / 2), y: b3.y - 1 };
+  const sweetheart = { x: bloque3Mark.x + 1, y: bloque3Mark.y };
+  grid[bloque3Mark.y][bloque3Mark.x] = "marker";
+  const bloque3Entry = TIMELINE.find((t) => t.id === "bloque3");
+  if (bloque3Entry) stopTiles.set(`${bloque3Mark.x},${bloque3Mark.y}`, bloque3Entry);
   grid[sweetheart.y][sweetheart.x] = "sweetheart";
 
-  // Columna despejada a la izquierda de la Cafetería y a la derecha del
-  // Bloque de aulas 2 — se usan para rodear esos edificios sin cruzarlos.
-  const BELOW_ROW = ROWS - 3;
-
-  // Ruta principal (garantiza que se pueda llegar a cada parada):
-  // horizontal arriba (Hangares -> Mar Caribe), un tramo vertical largo
-  // bajando por el costado despejado del lago/Ciénaga/Sierra Nevada, y
-  // horizontal abajo para entrar a cada edificio desde su frente.
+  // Ruta principal (garantiza que se pueda llegar a cada parada sin
+  // cruzar ningún edificio): sube/baja por columnas despejadas entre
+  // los edificios y entra a cada uno desde su frente (lado sur, que es
+  // donde queda el marcador de cada edificio interactivo).
   const route = [
     entrada,
+    { x: entrada.x, y: 16 },
     stopMarks.hangares,
     stopMarks.mar_caribe,
-    { x: 36, y: BELOW_ROW },
-    { x: 12, y: BELOW_ROW },
+    { x: 80, y: 16 },
+    { x: 80, y: 40 },
+    stopMarks.cienaga,
+    { x: 80, y: 40 },
+    { x: 80, y: 54 },
+    stopMarks.sierra_nevada,
+    { x: 80, y: 54 },
+    { x: 80, y: 71 }, // baja por debajo del lago (evita cruzarlo)
+    { x: 30, y: 71 },
+    { x: 30, y: 85 },
     stopMarks.cafeteria,
-    { x: 12, y: BELOW_ROW },
-    { x: 49, y: BELOW_ROW },
-    { x: 49, y: 44 },
-    stopMarks.bloque3,
+    { x: 19, y: 85 },
+    { x: 19, y: bloque3Mark.y },
+    { x: bloque3Mark.x, y: bloque3Mark.y },
     sweetheart,
   ].filter(Boolean);
 
@@ -246,10 +281,9 @@ function buildLevel() {
     paintPath(grid, route[i].x, route[i].y, route[i + 1].x, route[i + 1].y);
   }
 
-  // Senderos diagonales decorativos (como las líneas diagonales del
-  // bosquejo), cortando campo abierto entre zonas.
-  paintDiagonal(grid, 36, 10, 34, 34);
-  paintDiagonal(grid, 11, 25, 20, 38);
+  // Senderos diagonales decorativos, como en el bosquejo.
+  paintDiagonal(grid, 45, 16, 35, 74);
+  paintDiagonal(grid, 20, 26, 32, 60);
 
   return { grid, labels, stopTiles, stopMarks, entrada, sweetheart };
 }
@@ -277,7 +311,8 @@ k.scene("game", () => {
 
   // Solo se crean objetos para tiles que NO son pasto liso (el pasto ya
   // es el color de fondo) — así el mapa puede ser grande sin que el
-  // juego tenga que dibujar miles de rectángulos verdes de más.
+  // juego tenga que dibujar decenas de miles de rectángulos verdes de
+  // más.
   for (let y = 0; y < ROWS; y++) {
     for (let x = 0; x < COLS; x++) {
       const type = grid[y][x];
@@ -298,7 +333,7 @@ k.scene("game", () => {
     k.add([k.text(l.text, { size: 6 }), k.pos(l.x * TILE, l.y * TILE + 2), k.color(230, 230, 235), k.z(5)]);
   });
 
-  // Guiño a Tiana: un sapito escondido cerca del lago.
+  // Guiño a Tiana: un sapito escondido en el lago.
   k.add([
     k.text("R", { size: 7 }),
     k.pos(FROG_SPOT.x * TILE + 3, FROG_SPOT.y * TILE - 1),

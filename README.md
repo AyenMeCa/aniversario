@@ -52,6 +52,12 @@ para los packs gratuitos recomendados y cómo conectarlos.
 
 ## Controles
 
+El progreso se guarda automÃ¡ticamente en el almacenamiento local del navegador
+cada vez que se consigue un fragmento. Al volver a abrir el juego en el mismo
+navegador y desde el mismo sitio, los fragmentos recogidos se restauran solos.
+No se guarda en la cachÃ© de archivos: esa cachÃ© solo sirve para cargar el juego
+mÃ¡s rÃ¡pido y puede borrarse sin afectar el progreso.
+
 - Flechas o WASD para moverse
 - Espacio para avanzar/cerrar los diálogos
 
